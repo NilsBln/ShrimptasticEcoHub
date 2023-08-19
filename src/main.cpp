@@ -13,6 +13,7 @@
 #include <Preferences.h>
 #include <nvs_flash.h>
 #include <PubSubClient.h>
+#include <NeoPixelBus.h>
 
 // -------------------------------------------------------------------
 // objects
@@ -24,6 +25,8 @@ Preferences preferences;
 WiFiClient wifiClient;
 // MQTT object
 PubSubClient mqttClient(wifiClient);
+// LED Strip SK6812
+NeoPixelBus<NeoGrbwFeature, NeoEsp32I2s1X8Sk6812Method> LEDStrip(LEDPixelCount, LEDPin);
 
 // -------------------------------------------------------------------
 // forward declarations (allows functions in any order)
@@ -37,13 +40,16 @@ void WiFiStartConnection();
 void WiFiActions();
 void MQTTStartConnection();
 void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength);
+void MQTTSendSettings();
 void NTPGetServerTime();
 void NTPDateTime();
 float NTPTimeDecimal();
 int NVSControlInteger(const char* DBName, const char* VariableName, bool WritingModeIsActive, int DefaultValue, int NewValue);
 float NVSControlFloat(const char* DBName, const char* VariableName, bool WritingModeIsActive, float DefaultValue, float NewValue);
+void NVSReadSettings(bool ReadTimeSettings, bool ReadTimePhaseSettings);
 void NVSFormat();
 void EmptySerialBuffer();
+void LEDControl();
 
 // -------------------------------------------------------------------
 // functions
@@ -111,6 +117,8 @@ void MQTTStartConnection() {
     if (mqttClient.connect("ESP32Client")) {
       Serial.printf("MQTT / connected successfully with '%s'!\n", MQTTServer);
       Serial.println("-----");
+      mqttClient.subscribe(MQTTTopicStartTimeDay);
+      mqttClient.subscribe(MQTTTopicStartTimeNight);
       mqttClient.subscribe(MQTTTopicLEDStatus);
       mqttClient.subscribe(MQTTTopicLEDBrightness);
       mqttClient.subscribe(MQTTTopicLEDQuickness);
@@ -129,10 +137,69 @@ void MQTTStartConnection() {
 
 // MQTT - callback function for receiving a new MQTT Message
 void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
+  bool isDay;
+  if (NTPTimeDecimal()>=StartTimeDay && NTPTimeDecimal()<StartTimeNight) {
+    isDay = true;
+  }
+  else {
+    isDay = false;
+  }
   // -------------------------------------------------------------------
-  // topic is 'LEDStatus'
+  // topic is 'StartTimeDay'
   // -------------------------------------------------------------------
-  if (strcmp(TopicName, MQTTTopicLEDStatus) == 0) {
+  if (strcmp(TopicName, MQTTTopicStartTimeDay) == 0) {
+    bool minutesStart = false;
+    int hours = 0;
+    int minutes = 0;
+    for (int i=0;i<MessageLength;i++) {
+      if (Message[i] == ':') {
+        minutesStart = true;
+        i++; // skip this character
+      }
+      if (!minutesStart) {
+        hours = hours * 10 + ((char)Message[i] -'0');
+      }
+      else {
+        minutes = minutes * 10 + ((char)Message[i] -'0');
+      }
+    }
+    StartTimeDay = hours + static_cast<float>(minutes) / 60.0;
+    Serial.printf("MQTT / message received on topic '%s': %.3f\n", TopicName, StartTimeDay);
+    Serial.println("");
+    // store 'NewValue' in NVS database
+    NVSControlFloat(NVSDBName, NVSVarStartTimeDay, true, NVSStdStartTimeDay, StartTimeDay);
+    Serial.println("-----");
+  }
+  // -------------------------------------------------------------------
+  // topic is 'StartTimeNight'
+  // -------------------------------------------------------------------
+  else if (strcmp(TopicName, MQTTTopicStartTimeNight) == 0) {
+    bool minutesStart = false;
+    int hours = 0;
+    int minutes = 0;
+    for (int i=0;i<MessageLength;i++) {
+      if (Message[i] == ':') {
+        minutesStart = true;
+        i++; // skip this character
+      }
+      if (!minutesStart) {
+        hours = hours * 10 + ((char)Message[i] -'0');
+      }
+      else {
+        minutes = minutes * 10 + ((char)Message[i] -'0');
+      }
+    }
+    StartTimeNight = hours + static_cast<float>(minutes) / 60.0;
+    Serial.printf("MQTT / message received on topic '%s': %.3f\n", TopicName, StartTimeNight);
+    Serial.println("");
+    // store 'NewValue' in NVS database
+    NVSControlFloat(NVSDBName, NVSVarStartTimeNight, true, NVSStdStartTimeNight, StartTimeNight);
+    Serial.println("-----");
+  }
+  // -------------------------------------------------------------------
+  // topic is 'LEDStatus', day and night
+  // -------------------------------------------------------------------
+  else if (strcmp(TopicName, MQTTTopicLEDStatus) == 0) {
     LEDStatus = 0;
     // read message and store value
     for (int i=0;i<MessageLength;i++) {
@@ -141,7 +208,12 @@ void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
     Serial.printf("MQTT / message received on topic '%s': %d\n", TopicName, LEDStatus);
     Serial.println("");
     // store 'NewValue' in NVS database
-    NVSControlInteger(NVSDBName, NVSVarLEDStatus, true, NVSStdLEDStatus, LEDStatus);
+    if (isDay) {
+      NVSControlInteger(NVSDBName, NVSVarLEDStatusDay, true, NVSStdLEDStatusDay, LEDStatus);
+    }
+    else {
+      NVSControlInteger(NVSDBName, NVSVarLEDStatusNight, true, NVSStdLEDStatusNight, LEDStatus);
+    }
     Serial.println("-----");
     //
     //
@@ -158,7 +230,7 @@ void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
     }
   }
   // -------------------------------------------------------------------
-  // topic is 'LEDBrightness'
+  // topic is 'LEDBrightness', day and night
   // -------------------------------------------------------------------
   else if (strcmp(TopicName, MQTTTopicLEDBrightness) == 0) {
     LEDBrightness = 0;
@@ -169,11 +241,16 @@ void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
     Serial.printf("MQTT / message received on topic '%s': %d\n", TopicName, LEDBrightness);
     Serial.println("");
     // store 'NewValue' in NVS database
-    NVSControlInteger(NVSDBName, NVSVarLEDBrightnessDay, true, NVSStdLEDBrightnessDay, LEDBrightness);
+    if (isDay) {
+      NVSControlInteger(NVSDBName, NVSVarLEDBrightnessDay, true, NVSStdLEDBrightnessDay, LEDBrightness);
+    }
+    else {
+      NVSControlInteger(NVSDBName, NVSVarLEDBrightnessNight, true, NVSStdLEDBrightnessNight, LEDBrightness);
+    }
     Serial.println("-----");
   }
   // -------------------------------------------------------------------
-  // topic is 'LEDQuickness'
+  // topic is 'LEDQuickness', day and night
   // -------------------------------------------------------------------
   else if (strcmp(TopicName, MQTTTopicLEDQuickness) == 0) {
     LEDQuickness = 0;
@@ -194,11 +271,16 @@ void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
     Serial.printf("MQTT / message received on topic '%s': %d\n", TopicName, LEDQuickness);
     Serial.println("");
     // store 'NewValue' in NVS database
-    NVSControlInteger(NVSDBName, NVSVarLEDQuicknessDay, true, NVSStdLEDQuicknessDay, LEDQuickness);
+    if (isDay) {
+      NVSControlInteger(NVSDBName, NVSVarLEDQuicknessDay, true, NVSStdLEDQuicknessDay, LEDQuickness);
+    }
+    else {
+      NVSControlInteger(NVSDBName, NVSVarLEDQuicknessNight, true, NVSStdLEDQuicknessNight, LEDQuickness);
+    }
     Serial.println("-----");
   }
   // -------------------------------------------------------------------
-  // topic is 'LEDTau'
+  // topic is 'LEDTau', day and night
   // -------------------------------------------------------------------
   else if (strcmp(TopicName, MQTTTopicLEDTau) == 0) {
     LEDTau = 0.0;
@@ -212,11 +294,16 @@ void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
     Serial.printf("MQTT / message received on topic '%s': %.3f\n", TopicName, LEDTau);
     Serial.println("");
     // store 'NewValue' in NVS database
-    NVSControlFloat(NVSDBName, NVSVarLEDTauDay, true, NVSStdLEDTauDay, LEDTau);
+    if (isDay) {
+      NVSControlFloat(NVSDBName, NVSVarLEDTauDay, true, NVSStdLEDTauDay, LEDTau);
+    }
+    else {
+      NVSControlFloat(NVSDBName, NVSVarLEDTauNight, true, NVSStdLEDTauNight, LEDTau);
+    }
     Serial.println("-----");
   }
   // -------------------------------------------------------------------
-  // topic is 'LEDColorTop'
+  // topic is 'LEDColorTop', day and night
   // -------------------------------------------------------------------
   else if (strcmp(TopicName, MQTTTopicLEDColorTop) == 0) {
     LEDColorTopR = 0;
@@ -241,13 +328,20 @@ void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
     Serial.printf("MQTT / message received on topic '%s': %d, %d, %d\n", TopicName, LEDColorTopR, LEDColorTopG, LEDColorTopB);
     Serial.println("");
     // store 'NewValue' in NVS database
-    NVSControlInteger(NVSDBName, NVSVarLEDColorTopDayR, true, NVSStdLEDColorTopDayR, LEDColorTopR);
-    NVSControlInteger(NVSDBName, NVSVarLEDColorTopDayG, true, NVSStdLEDColorTopDayG, LEDColorTopG);
-    NVSControlInteger(NVSDBName, NVSVarLEDColorTopDayB, true, NVSStdLEDColorTopDayB, LEDColorTopB);
+    if (isDay) {
+      NVSControlInteger(NVSDBName, NVSVarLEDColorTopDayR, true, NVSStdLEDColorTopDayR, LEDColorTopR);
+      NVSControlInteger(NVSDBName, NVSVarLEDColorTopDayG, true, NVSStdLEDColorTopDayG, LEDColorTopG);
+      NVSControlInteger(NVSDBName, NVSVarLEDColorTopDayB, true, NVSStdLEDColorTopDayB, LEDColorTopB);
+    }
+    else {
+      NVSControlInteger(NVSDBName, NVSVarLEDColorTopNightR, true, NVSStdLEDColorTopNightR, LEDColorTopR);
+      NVSControlInteger(NVSDBName, NVSVarLEDColorTopNightG, true, NVSStdLEDColorTopNightG, LEDColorTopG);
+      NVSControlInteger(NVSDBName, NVSVarLEDColorTopNightB, true, NVSStdLEDColorTopNightB, LEDColorTopB);
+    }
     Serial.println("-----");
   }
   // -------------------------------------------------------------------
-  // topic is 'LEDColorBottom'
+  // topic is 'LEDColorBottom', day and night
   // -------------------------------------------------------------------
   else if (strcmp(TopicName, MQTTTopicLEDColorBottom) == 0) {
     LEDColorBottomR = 0;
@@ -272,11 +366,75 @@ void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
     Serial.printf("MQTT / message received on topic '%s': %d, %d, %d\n", TopicName, LEDColorBottomR, LEDColorBottomG, LEDColorBottomB);
     Serial.println("");
     // store 'NewValue' in NVS database
-    NVSControlInteger(NVSDBName, NVSVarLEDColorBottomDayR, true, NVSStdLEDColorBottomDayR, LEDColorBottomR);
-    NVSControlInteger(NVSDBName, NVSVarLEDColorBottomDayG, true, NVSStdLEDColorBottomDayG, LEDColorBottomG);
-    NVSControlInteger(NVSDBName, NVSVarLEDColorBottomDayB, true, NVSStdLEDColorBottomDayB, LEDColorBottomB);
+    if (isDay) {
+      NVSControlInteger(NVSDBName, NVSVarLEDColorBottomDayR, true, NVSStdLEDColorBottomDayR, LEDColorBottomR);
+      NVSControlInteger(NVSDBName, NVSVarLEDColorBottomDayG, true, NVSStdLEDColorBottomDayG, LEDColorBottomG);
+      NVSControlInteger(NVSDBName, NVSVarLEDColorBottomDayB, true, NVSStdLEDColorBottomDayB, LEDColorBottomB);
+    }
+    else {
+      NVSControlInteger(NVSDBName, NVSVarLEDColorBottomNightR, true, NVSStdLEDColorBottomNightR, LEDColorBottomR);
+      NVSControlInteger(NVSDBName, NVSVarLEDColorBottomNightG, true, NVSStdLEDColorBottomNightG, LEDColorBottomG);
+      NVSControlInteger(NVSDBName, NVSVarLEDColorBottomNightB, true, NVSStdLEDColorBottomNightB, LEDColorBottomB);
+    }
     Serial.println("-----");
   }
+}
+
+// MQTT - send new setting on time phase shift
+void MQTTSendSettings() {
+  std::string message;
+  std::string PaddingR;
+  std::string PaddingG;
+  std::string PaddingB;
+
+  auto resetVariables = [&]() {
+    PaddingR = "";
+    PaddingG = "";
+    PaddingB = "";
+    message = "";
+  };
+
+  // LEDStatus
+  message = std::to_string(LEDStatus);
+  mqttClient.publish(MQTTTopicLEDStatus, message.c_str());
+  resetVariables();
+
+  // LEDBrightness
+  message = std::to_string(LEDBrightness);
+  mqttClient.publish(MQTTTopicLEDBrightness, message.c_str());
+  resetVariables();
+
+  // LEDQuickness
+  message = std::to_string(LEDQuickness);
+  mqttClient.publish(MQTTTopicLEDQuickness, message.c_str());
+  resetVariables();
+
+  // LEDTau
+  message = std::to_string(static_cast<int>(LEDTau*1000));
+  mqttClient.publish(MQTTTopicLEDTau, message.c_str());
+  resetVariables();
+
+  // LEDColorTop
+  PaddingR = (LEDColorTopR < 10 ? "  " : (LEDColorTopR < 100 ? " " : ""));
+  PaddingG = (LEDColorTopG < 10 ? "  " : (LEDColorTopG < 100 ? " " : ""));
+  PaddingB = (LEDColorTopB < 10 ? "  " : (LEDColorTopB < 100 ? " " : ""));
+  message = "[" +
+            PaddingR + std::to_string(LEDColorTopR) + "," +
+            PaddingG + std::to_string(LEDColorTopG) + "," +
+            PaddingB + std::to_string(LEDColorTopB) + "]";
+  mqttClient.publish(MQTTTopicLEDColorTop, message.c_str());
+  resetVariables();
+
+  // LEDColorBottom
+  PaddingR = (LEDColorBottomR < 10 ? "  " : (LEDColorBottomR < 100 ? " " : ""));
+  PaddingG = (LEDColorBottomG < 10 ? "  " : (LEDColorBottomG < 100 ? " " : ""));
+  PaddingB = (LEDColorBottomB < 10 ? "  " : (LEDColorBottomB < 100 ? " " : ""));
+  message = "[" +
+            PaddingR + std::to_string(LEDColorBottomR) + "," +
+            PaddingG + std::to_string(LEDColorBottomG) + "," +
+            PaddingB + std::to_string(LEDColorBottomB) + "]";
+  mqttClient.publish(MQTTTopicLEDColorBottom, message.c_str());
+  resetVariables();
 }
 
 // NTP - synchronize system time with NTP server
@@ -505,6 +663,48 @@ float NVSControlFloat(const char* DBName, const char* VariableName, bool Writing
   return ReturnValue;
 }
 
+// NVS - read stored values from NVS depending on daytime
+void NVSReadSettings(bool ReadTimeSettings, bool ReadTimePhaseSettings) {
+  if (ReadTimeSettings) {
+    StartTimeDay = NVSControlFloat(NVSDBName, NVSVarStartTimeDay, true, NVSStdStartTimeDay);
+    StartTimeNight = NVSControlFloat(NVSDBName, NVSVarStartTimeNight, true, NVSStdStartTimeNight);
+    Serial.println("-----");
+  }
+  if (ReadTimePhaseSettings) {
+    // check time phase
+    if (NTPTimeDecimal()>=StartTimeDay && NTPTimeDecimal()<StartTimeNight) {
+      LEDStatus = NVSControlInteger(NVSDBName, NVSVarLEDStatusDay, true, NVSStdLEDStatusDay);
+      LEDBrightness = NVSControlInteger(NVSDBName, NVSVarLEDBrightnessDay, true, NVSStdLEDBrightnessDay);
+      LEDQuickness = NVSControlInteger(NVSDBName, NVSVarLEDQuicknessDay, true, NVSStdLEDQuicknessDay);
+      LEDTau = NVSControlFloat(NVSDBName, NVSVarLEDTauDay, true, NVSStdLEDTauDay);
+      LEDColorTopR = NVSControlInteger(NVSDBName, NVSVarLEDColorTopDayR, true, NVSStdLEDColorTopDayR);
+      LEDColorTopG = NVSControlInteger(NVSDBName, NVSVarLEDColorTopDayG, true, NVSStdLEDColorTopDayG);
+      LEDColorTopB = NVSControlInteger(NVSDBName, NVSVarLEDColorTopDayB, true, NVSStdLEDColorTopDayB);
+      LEDColorBottomR = NVSControlInteger(NVSDBName, NVSVarLEDColorBottomDayR, true, NVSStdLEDColorBottomDayR);
+      LEDColorBottomG = NVSControlInteger(NVSDBName, NVSVarLEDColorBottomDayG, true, NVSStdLEDColorBottomDayG);
+      LEDColorBottomB = NVSControlInteger(NVSDBName, NVSVarLEDColorBottomDayB, true, NVSStdLEDColorBottomDayB);
+      MQTTSendSettings();
+      Serial.println("LED / daytime settings loaded");
+      Serial.println("-----");
+    }
+    else {
+      LEDStatus = NVSControlInteger(NVSDBName, NVSVarLEDStatusNight, true, NVSStdLEDStatusNight);
+      LEDBrightness = NVSControlInteger(NVSDBName, NVSVarLEDBrightnessNight, true, NVSStdLEDBrightnessNight);
+      LEDQuickness = NVSControlInteger(NVSDBName, NVSVarLEDQuicknessNight, true, NVSStdLEDQuicknessNight);
+      LEDTau = NVSControlFloat(NVSDBName, NVSVarLEDTauNight, true, NVSStdLEDTauNight);
+      LEDColorTopR = NVSControlInteger(NVSDBName, NVSVarLEDColorTopNightR, true, NVSStdLEDColorTopNightR);
+      LEDColorTopG = NVSControlInteger(NVSDBName, NVSVarLEDColorTopNightG, true, NVSStdLEDColorTopNightG);
+      LEDColorTopB = NVSControlInteger(NVSDBName, NVSVarLEDColorTopNightB, true, NVSStdLEDColorTopNightB);
+      LEDColorBottomR = NVSControlInteger(NVSDBName, NVSVarLEDColorBottomNightR, true, NVSStdLEDColorBottomNightR);
+      LEDColorBottomG = NVSControlInteger(NVSDBName, NVSVarLEDColorBottomNightG, true, NVSStdLEDColorBottomNightG);
+      LEDColorBottomB = NVSControlInteger(NVSDBName, NVSVarLEDColorBottomNightB, true, NVSStdLEDColorBottomNightB);
+      MQTTSendSettings();
+      Serial.println("LED / nighttime settings loaded");
+      Serial.println("-----");
+    }
+  }
+}
+
 // NVS - Format database completely
 void NVSFormat() {
   nvs_flash_erase(); // delete partition
@@ -519,6 +719,17 @@ void EmptySerialBuffer() {
   while (Serial.available() > 0) {
     char c = Serial.read(); // each read character is automatically removed from the buffer
   }
+}
+
+// LED - amazing color gradient
+void LEDControl() {
+  // set color
+  //LEDStrip.SetPixelColor(0, RgbwColor(LEDColorBottomR, LEDColorBottomG, LEDColorBottomB, 0));
+  //LEDStrip.SetPixelColor(41, RgbwColor(LEDColorTopR, LEDColorTopG, LEDColorTopB, 0));
+  // show color
+  //LEDStrip.Show();
+  Serial.println("LED / light has been adjusted");
+  Serial.println("-----");
 }
 
 // -------------------------------------------------------------------
@@ -543,39 +754,13 @@ void setup() {
     delay(100); // short delay to avoid unnecessary load on CPU
   }
 
-  // check time phase
-  if (NTPTimeDecimal()>=StartTimeDay && NTPTimeDecimal()<StartTimeNight) {
-    isDay = true;
-  }
-  else {
-    isDay = false;
-  }
+  // NVS - read time settings
+  NVSReadSettings(true, false);
 
-  // NVS - read stored values
-  LEDStatus = NVSControlInteger(NVSDBName, NVSVarLEDStatus, false, NVSStdLEDStatus);
-  if (isDay) {
-    LEDBrightness = NVSControlInteger(NVSDBName, NVSVarLEDBrightnessDay, false, NVSStdLEDBrightnessDay);
-    LEDQuickness = NVSControlInteger(NVSDBName, NVSVarLEDQuicknessDay, false, NVSStdLEDQuicknessDay);
-    LEDTau = NVSControlFloat(NVSDBName, NVSVarLEDTauDay, false, NVSStdLEDTauDay);
-    LEDColorTopR = NVSControlInteger(NVSDBName, NVSVarLEDColorTopDayR, false, NVSStdLEDColorTopDayR);
-    LEDColorTopG = NVSControlInteger(NVSDBName, NVSVarLEDColorTopDayG, false, NVSStdLEDColorTopDayG);
-    LEDColorTopB = NVSControlInteger(NVSDBName, NVSVarLEDColorTopDayB, false, NVSStdLEDColorTopDayB);
-    LEDColorBottomR = NVSControlInteger(NVSDBName, NVSVarLEDColorBottomDayG, false, NVSStdLEDColorBottomDayR);
-    LEDColorBottomG = NVSControlInteger(NVSDBName, NVSVarLEDColorBottomDayG, false, NVSStdLEDColorBottomDayG);
-    LEDColorBottomB = NVSControlInteger(NVSDBName, NVSVarLEDColorBottomDayB, false, NVSStdLEDColorBottomDayB);
-  }
-  else {
-    LEDBrightness = NVSControlInteger(NVSDBName, NVSVarLEDBrightnessNight, false, NVSStdLEDBrightnessNight);
-    LEDQuickness = NVSControlInteger(NVSDBName, NVSVarLEDQuicknessNight, false, NVSStdLEDQuicknessNight);
-    LEDTau = NVSControlFloat(NVSDBName, NVSVarLEDTauNight, false, NVSStdLEDTauNight);
-    LEDColorTopR = NVSControlInteger(NVSDBName, NVSVarLEDColorTopNightR, false, NVSStdLEDColorTopNightR);
-    LEDColorTopG = NVSControlInteger(NVSDBName, NVSVarLEDColorTopNightG, false, NVSStdLEDColorTopNightG);
-    LEDColorTopB = NVSControlInteger(NVSDBName, NVSVarLEDColorTopNightB, false, NVSStdLEDColorTopNightB);
-    LEDColorBottomR = NVSControlInteger(NVSDBName, NVSVarLEDColorBottomNightG, false, NVSStdLEDColorBottomNightR);
-    LEDColorBottomG = NVSControlInteger(NVSDBName, NVSVarLEDColorBottomNightG, false, NVSStdLEDColorBottomNightG);
-    LEDColorBottomB = NVSControlInteger(NVSDBName, NVSVarLEDColorBottomNightB, false, NVSStdLEDColorBottomNightB);
-  }
-  Serial.println("-----");
+  // initialize LEDStrip
+  //LEDStrip.Begin();
+  //LEDStrip.Show();
+
 }
 
 // -------------------------------------------------------------------
@@ -591,11 +776,12 @@ void loop() {
 
     if (!OneTimeCodeExecutedDay) {
       // daytime - one time code
-      Serial.println("Daytime is active!");
+      Serial.println("Status / daytime is active!");
       Serial.println("-----");
       OneTimeCodeExecutedDay = true; // this code was executed, don't do it again for this phase
       OneTimeCodeExecutedNight = false; // initialization for the next nighttime phase
-      isDay = true;
+      NVSReadSettings(false, true); // phase changed, read new time phase settings
+      LEDControl();
     }
   }
   else {
@@ -604,11 +790,12 @@ void loop() {
 
     if (!OneTimeCodeExecutedNight) {
       // nighttime - one time code
-      Serial.println("Nighttime is active!");
+      Serial.println("Status / nighttime is active!");
       Serial.println("-----");
       OneTimeCodeExecutedDay = false; // initialization for the next daytime phase
       OneTimeCodeExecutedNight = true; // this code was executed, don't do it again for this phase
-      isDay = false;
+      NVSReadSettings(false, true); // phase changed, read new time phase settings
+      LEDControl();
     }
   }
 }
