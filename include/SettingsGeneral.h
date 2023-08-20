@@ -16,8 +16,8 @@ const char* MQTTTopicLEDStatus          = "LEDStatus";      // 0: Night; 1: Day
 const char* MQTTTopicLEDBrightness      = "LEDBrightness";  // 0..100 = Lights off .. full intensity
 const char* MQTTTopicLEDQuickness       = "LEDQuickness";   // -100..0..100 = slow..linear..fast
 const char* MQTTTopicLEDTau             = "LEDTau";         // 5125..8200 = (faster increase) 41/8*1000..41/5*1000 (slower increase)
-const char* MQTTTopicLEDColorTop        = "LEDColorTop";    // [255,255,255]
-const char* MQTTTopicLEDColorBottom     = "LEDColorBottom"; // [255,255,255]
+const char* MQTTTopicLEDColorTop        = "LEDColorTop";    // [  5, 55,255]
+const char* MQTTTopicLEDColorBottom     = "LEDColorBottom"; // [  5, 55,255]
 
 // NTP - Server
 const char* NTPServer = "pool.ntp.org";
@@ -28,32 +28,36 @@ const int   daylightOffset_sec = 3600;
 const char* NVSDBName = "NVSDB";
 
 // NVS - variable names
-const char* NVSVarStartTimeDay          = "Value01";
-const char* NVSVarStartTimeNight        = "Value02";
-const char* NVSVarLEDStatusDay          = "Value03";
-const char* NVSVarLEDStatusNight        = "Value04";
-const char* NVSVarLEDBrightnessDay      = "Value05";
-const char* NVSVarLEDBrightnessNight    = "Value06";
-const char* NVSVarLEDQuicknessDay       = "Value07";
-const char* NVSVarLEDQuicknessNight     = "Value08";
-const char* NVSVarLEDTauDay             = "Value09";
-const char* NVSVarLEDTauNight           = "Value10";
-const char* NVSVarLEDColorTopDayR       = "Value11";
-const char* NVSVarLEDColorTopDayG       = "Value12";
-const char* NVSVarLEDColorTopDayB       = "Value13";
-const char* NVSVarLEDColorTopNightR     = "Value14";
-const char* NVSVarLEDColorTopNightG     = "Value15";
-const char* NVSVarLEDColorTopNightB     = "Value16";
-const char* NVSVarLEDColorBottomDayR    = "Value17";
-const char* NVSVarLEDColorBottomDayG    = "Value18";
-const char* NVSVarLEDColorBottomDayB    = "Value19";
-const char* NVSVarLEDColorBottomNightR  = "Value20";
-const char* NVSVarLEDColorBottomNightG  = "Value21";
-const char* NVSVarLEDColorBottomNightB  = "Value22";
+const char* NVSVarStartTimeDayHours     = "Value01";
+const char* NVSVarStartTimeDayMinutes   = "Value02";
+const char* NVSVarStartTimeNightHours   = "Value03";
+const char* NVSVarStartTimeNightMinutes = "Value04";
+const char* NVSVarLEDStatusDay          = "Value05";
+const char* NVSVarLEDStatusNight        = "Value06";
+const char* NVSVarLEDBrightnessDay      = "Value07";
+const char* NVSVarLEDBrightnessNight    = "Value08";
+const char* NVSVarLEDQuicknessDay       = "Value09";
+const char* NVSVarLEDQuicknessNight     = "Value10";
+const char* NVSVarLEDTauDay             = "Value11";
+const char* NVSVarLEDTauNight           = "Value12";
+const char* NVSVarLEDColorTopDayR       = "Value13";
+const char* NVSVarLEDColorTopDayG       = "Value14";
+const char* NVSVarLEDColorTopDayB       = "Value15";
+const char* NVSVarLEDColorTopNightR     = "Value16";
+const char* NVSVarLEDColorTopNightG     = "Value17";
+const char* NVSVarLEDColorTopNightB     = "Value18";
+const char* NVSVarLEDColorBottomDayR    = "Value19";
+const char* NVSVarLEDColorBottomDayG    = "Value20";
+const char* NVSVarLEDColorBottomDayB    = "Value21";
+const char* NVSVarLEDColorBottomNightR  = "Value22";
+const char* NVSVarLEDColorBottomNightG  = "Value23";
+const char* NVSVarLEDColorBottomNightB  = "Value24";
 
 // NVS - standard values
-float NVSStdStartTimeDay = 9.0;
-float NVSStdStartTimeNight = 22.0;
+int NVSStdStartTimeDayHours = 9;
+int NVSStdStartTimeDayMinutes = 0;
+int NVSStdStartTimeNightHours = 22;
+int NVSStdStartTimeNightMinutes = 30;
 int NVSStdLEDStatusDay = 1;
 int NVSStdLEDStatusNight = 1;
 int NVSStdLEDBrightnessDay = 70;
@@ -65,19 +69,23 @@ float NVSStdLEDTauNight = 5.125;
 int NVSStdLEDColorTopDayR= 0;
 int NVSStdLEDColorTopDayG = 193;
 int NVSStdLEDColorTopDayB = 255;
-int NVSStdLEDColorTopNightR= 255;
+int NVSStdLEDColorTopNightR= 77;
 int NVSStdLEDColorTopNightG = 0;
-int NVSStdLEDColorTopNightB = 119;
+int NVSStdLEDColorTopNightB = 26;
 int NVSStdLEDColorBottomDayR = 194;
 int NVSStdLEDColorBottomDayG = 255;
 int NVSStdLEDColorBottomDayB = 0;
-int NVSStdLEDColorBottomNightR = 118;
-int NVSStdLEDColorBottomNightG = 0;
-int NVSStdLEDColorBottomNightB = 255;
+int NVSStdLEDColorBottomNightR = 0;
+int NVSStdLEDColorBottomNightG = 60;
+int NVSStdLEDColorBottomNightB = 82;
 
 // Timer
 float StartTimeDay;
 float StartTimeNight;
+int StartTimeDayHours;
+int StartTimeDayMinutes;
+int StartTimeNightHours;
+int StartTimeNightMinutes;
 bool OneTimeCodeExecutedDay = false;
 bool OneTimeCodeExecutedNight = false;
 

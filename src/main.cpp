@@ -145,25 +145,28 @@ void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
   // -------------------------------------------------------------------
   if (strcmp(TopicName, MQTTTopicStartTimeDay) == 0) {
     bool minutesStart = false;
-    int hours = 0;
-    int minutes = 0;
+    StartTimeDayHours = 0;
+    StartTimeDayMinutes = 0;
+    // read message and store values
     for (int i=0;i<MessageLength;i++) {
       if (Message[i] == ':') {
         minutesStart = true;
         i++; // skip this character
       }
       if (!minutesStart) {
-        hours = hours * 10 + ((char)Message[i] -'0');
+        StartTimeDayHours = StartTimeDayHours * 10 + ((char)Message[i] -'0');
       }
       else {
-        minutes = minutes * 10 + ((char)Message[i] -'0');
+        StartTimeDayMinutes = StartTimeDayMinutes * 10 + ((char)Message[i] -'0');
       }
     }
-    StartTimeDay = hours + static_cast<float>(minutes) / 60.0;
+    // build float for easier comparison with actual time
+    StartTimeDay = StartTimeDayHours + static_cast<float>(StartTimeDayMinutes) / 60.0;
     Serial.printf("MQTT / message received on topic '%s': %.3f\n", TopicName, StartTimeDay);
     Serial.println("");
-    // store 'NewValue' in NVS database
-    NVSControlFloat(NVSDBName, NVSVarStartTimeDay, true, NVSStdStartTimeDay, StartTimeDay);
+    // store 'NewValue' in NVS database, but hours and minutes separately for higher precision
+    NVSControlInteger(NVSDBName, NVSVarStartTimeDayHours, true, NVSStdStartTimeDayHours, StartTimeDayHours);
+    NVSControlInteger(NVSDBName, NVSVarStartTimeDayMinutes, true, NVSStdStartTimeDayMinutes, StartTimeDayMinutes);
     Serial.println("-----");
   }
   // -------------------------------------------------------------------
@@ -171,25 +174,28 @@ void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
   // -------------------------------------------------------------------
   else if (strcmp(TopicName, MQTTTopicStartTimeNight) == 0) {
     bool minutesStart = false;
-    int hours = 0;
-    int minutes = 0;
+    StartTimeNightHours = 0;
+    StartTimeNightMinutes = 0;
+    // read message and store values
     for (int i=0;i<MessageLength;i++) {
       if (Message[i] == ':') {
         minutesStart = true;
         i++; // skip this character
       }
       if (!minutesStart) {
-        hours = hours * 10 + ((char)Message[i] -'0');
+        StartTimeNightHours = StartTimeNightHours * 10 + ((char)Message[i] -'0');
       }
       else {
-        minutes = minutes * 10 + ((char)Message[i] -'0');
+        StartTimeNightMinutes = StartTimeNightMinutes * 10 + ((char)Message[i] -'0');
       }
     }
-    StartTimeNight = hours + static_cast<float>(minutes) / 60.0;
+    // build float for easier comparison with actual time
+    StartTimeNight = StartTimeNightHours + static_cast<float>(StartTimeNightMinutes) / 60.0;
     Serial.printf("MQTT / message received on topic '%s': %.3f\n", TopicName, StartTimeNight);
     Serial.println("");
-    // store 'NewValue' in NVS database
-    NVSControlFloat(NVSDBName, NVSVarStartTimeNight, true, NVSStdStartTimeNight, StartTimeNight);
+    // store 'NewValue' in NVS database, but hours and minutes separately for higher precision
+    NVSControlInteger(NVSDBName, NVSVarStartTimeNightHours, true, NVSStdStartTimeNightHours, StartTimeNightHours);
+    NVSControlInteger(NVSDBName, NVSVarStartTimeNightMinutes, true, NVSStdStartTimeNightMinutes, StartTimeNightMinutes);
     Serial.println("-----");
   }
   // -------------------------------------------------------------------
@@ -391,16 +397,12 @@ void MQTTSendSettings() {
   };
 
   // StartTimeDay
-  int startHoursDay = static_cast<int>(StartTimeDay);
-  int startMinutesDay = static_cast<int>((StartTimeDay - startHoursDay) * 60);
-  message = std::to_string(startHoursDay) + ":" + (startMinutesDay < 10 ? "0" : "") + std::to_string(startMinutesDay);
+  message = std::to_string(StartTimeDayHours) + ":" + (StartTimeDayMinutes < 10 ? "0" : "") + std::to_string(StartTimeDayMinutes);
   mqttClient.publish(MQTTTopicStartTimeDay, message.c_str());
   resetVariables();
 
   // StartTimeNight
-  int startHoursNight = static_cast<int>(StartTimeNight);
-  int startMinutesNight = static_cast<int>((StartTimeNight - startHoursNight) * 60);
-  message = std::to_string(startHoursNight) + ":" + (startMinutesNight < 10 ? "0" : "") + std::to_string(startMinutesNight);
+  message = std::to_string(StartTimeNightHours) + ":" + (StartTimeNightMinutes < 10 ? "0" : "") + std::to_string(StartTimeNightMinutes);
   mqttClient.publish(MQTTTopicStartTimeNight, message.c_str());
   resetVariables();
 
@@ -683,15 +685,19 @@ float NVSControlFloat(const char* DBName, const char* VariableName, bool Writing
 // NVS - read stored values from NVS depending on daytime
 void NVSReadSettings(bool ReadTimeSettings, bool ReadTimePhaseSettings) {
   if (ReadTimeSettings) {
-    StartTimeDay = NVSControlFloat(NVSDBName, NVSVarStartTimeDay, true, NVSStdStartTimeDay);
-    StartTimeNight = NVSControlFloat(NVSDBName, NVSVarStartTimeNight, true, NVSStdStartTimeNight);
+    StartTimeDayHours = NVSControlInteger(NVSDBName, NVSVarStartTimeDayHours, true, NVSStdStartTimeDayHours);
+    StartTimeDayMinutes = NVSControlInteger(NVSDBName, NVSVarStartTimeDayMinutes, true, NVSStdStartTimeDayMinutes);
+    StartTimeNightHours = NVSControlInteger(NVSDBName, NVSVarStartTimeNightHours, true, NVSStdStartTimeNightHours);
+    StartTimeNightMinutes = NVSControlInteger(NVSDBName, NVSVarStartTimeNightMinutes, true, NVSStdStartTimeNightMinutes);
+    // build floats for easier comparison with actual time
+    StartTimeDay = StartTimeDayHours + static_cast<float>(StartTimeDayMinutes) / 60.0;
+    StartTimeNight = StartTimeNightHours + static_cast<float>(StartTimeNightMinutes) / 60.0;
     Serial.println("-----");
   }
   if (ReadTimePhaseSettings) {
     // check time phase
     bool isDayPhase = NTPCheckTimePhase();
     if (isDayPhase) {
-    // if (NTPTimeDecimal()>=StartTimeDay && NTPTimeDecimal()<StartTimeNight) {
       LEDStatus = NVSControlInteger(NVSDBName, NVSVarLEDStatusDay, true, NVSStdLEDStatusDay);
       LEDBrightness = NVSControlInteger(NVSDBName, NVSVarLEDBrightnessDay, true, NVSStdLEDBrightnessDay);
       LEDQuickness = NVSControlInteger(NVSDBName, NVSVarLEDQuicknessDay, true, NVSStdLEDQuicknessDay);
