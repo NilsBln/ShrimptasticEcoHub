@@ -2,8 +2,10 @@
 // General Settings
 // -------------------------------------------------------------------
 
-// WiFi - connecting status
+// WiFi & MQTT - status
 bool isConnecting = false;
+bool isSending = false;
+int MQTTNumLoops;
 
 // MQTT - server settings
 const char* MQTTServer = "192.168.178.25";
@@ -96,7 +98,6 @@ const int LEDPixelCount = 41;
 const int LEDPin = 8;
 int LEDStatus;
 int LEDBrightness;
-int LEDBrightnessCorrection;
 int LEDAmplifier;
 int LEDTauThousand;
 float LEDTau;
@@ -106,6 +107,3 @@ int LEDColorTopB;
 int LEDColorBottomR;
 int LEDColorBottomG;
 int LEDColorBottomB;
-int LEDColorDeltaR;
-int LEDColorDeltaG;
-int LEDColorDeltaB;
