@@ -122,7 +122,7 @@ void MQTTStartConnection() {
       mqttClient.subscribe(MQTTTopicStartTimeNight);
       mqttClient.subscribe(MQTTTopicLEDStatus);
       mqttClient.subscribe(MQTTTopicLEDBrightness);
-      mqttClient.subscribe(MQTTTopicLEDQuickness);
+      mqttClient.subscribe(MQTTTopicLEDAmplifier);
       mqttClient.subscribe(MQTTTopicLEDTauThousand);
       mqttClient.subscribe(MQTTTopicLEDColorTop);
       mqttClient.subscribe(MQTTTopicLEDColorBottom);
@@ -252,10 +252,10 @@ void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
     Serial.println("-----");
   }
   // -------------------------------------------------------------------
-  // topic is 'LEDQuickness', day and night
+  // topic is 'LEDAmplifier', day and night
   // -------------------------------------------------------------------
-  else if (strcmp(TopicName, MQTTTopicLEDQuickness) == 0) {
-    LEDQuickness = 0;
+  else if (strcmp(TopicName, MQTTTopicLEDAmplifier) == 0) {
+    LEDAmplifier = 0;
     bool isNegative = false;
     // check if first character is minus sign
     if (Message[0] == '-') {
@@ -265,19 +265,19 @@ void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
     int startIndex = isNegative ? 1 : 0;
     // read message and store value
     for (int i=startIndex;i<MessageLength;i++) {
-      LEDQuickness = LEDQuickness * 10 + ((char)Message[i] -'0');
+      LEDAmplifier = LEDAmplifier * 10 + ((char)Message[i] -'0');
     }
     if (isNegative) {
-      LEDQuickness = LEDQuickness * -1;
+      LEDAmplifier = LEDAmplifier * -1;
     }
-    Serial.printf("MQTT / message received on topic '%s': %d\n", TopicName, LEDQuickness);
+    Serial.printf("MQTT / message received on topic '%s': %d\n", TopicName, LEDAmplifier);
     Serial.println("");
     // store 'NewValue' in NVS database according to time phase
     if (isDayPhase) {
-      NVSControlInteger(NVSDBName, NVSVarLEDQuicknessDay, true, NVSStdLEDQuicknessDay, LEDQuickness);
+      NVSControlInteger(NVSDBName, NVSVarLEDAmplifierDay, true, NVSStdLEDAmplifierDay, LEDAmplifier);
     }
     else {
-      NVSControlInteger(NVSDBName, NVSVarLEDQuicknessNight, true, NVSStdLEDQuicknessNight, LEDQuickness);
+      NVSControlInteger(NVSDBName, NVSVarLEDAmplifierNight, true, NVSStdLEDAmplifierNight, LEDAmplifier);
     }
     Serial.println("-----");
   }
@@ -420,9 +420,9 @@ void MQTTSendSettings() {
   mqttClient.publish(MQTTTopicLEDBrightness, message.c_str());
   resetVariables();
 
-  // LEDQuickness
-  message = std::to_string(LEDQuickness);
-  mqttClient.publish(MQTTTopicLEDQuickness, message.c_str());
+  // LEDAmplifier
+  message = std::to_string(LEDAmplifier);
+  mqttClient.publish(MQTTTopicLEDAmplifier, message.c_str());
   resetVariables();
 
   // LEDTau
@@ -497,7 +497,7 @@ float NTPTimeDecimal() {
   return float(timeinfo.tm_hour) + float(timeinfo.tm_min)/60;
 }
 
-// NTP - check day phase
+// NTP - check time phase
 bool NTPCheckTimePhase() {
   bool isDayPhase = ((NTPTimeDecimal() >= StartTimeDay && NTPTimeDecimal() < StartTimeNight) ||
                     (NTPTimeDecimal() >= StartTimeDay && StartTimeNight < StartTimeDay) ||
@@ -615,7 +615,7 @@ void NVSReadSettings(bool ReadTimeSettings, bool ReadTimePhaseSettings) {
     if (isDayPhase) {
       LEDStatus = NVSControlInteger(NVSDBName, NVSVarLEDStatusDay, true, NVSStdLEDStatusDay);
       LEDBrightness = NVSControlInteger(NVSDBName, NVSVarLEDBrightnessDay, true, NVSStdLEDBrightnessDay);
-      LEDQuickness = NVSControlInteger(NVSDBName, NVSVarLEDQuicknessDay, true, NVSStdLEDQuicknessDay);
+      LEDAmplifier = NVSControlInteger(NVSDBName, NVSVarLEDAmplifierDay, true, NVSStdLEDAmplifierDay);
       LEDTauThousand = NVSControlInteger(NVSDBName, NVSVarLEDTauDay, true, NVSStdLEDTauDay);
       // build float (devide integer by 1000) for LED program
       LEDTau = LEDTauThousand / 1000.0;
@@ -632,7 +632,7 @@ void NVSReadSettings(bool ReadTimeSettings, bool ReadTimePhaseSettings) {
     else {
       LEDStatus = NVSControlInteger(NVSDBName, NVSVarLEDStatusNight, true, NVSStdLEDStatusNight);
       LEDBrightness = NVSControlInteger(NVSDBName, NVSVarLEDBrightnessNight, true, NVSStdLEDBrightnessNight);
-      LEDQuickness = NVSControlInteger(NVSDBName, NVSVarLEDQuicknessNight, true, NVSStdLEDQuicknessNight);
+      LEDAmplifier = NVSControlInteger(NVSDBName, NVSVarLEDAmplifierNight, true, NVSStdLEDAmplifierNight);
       LEDTauThousand = NVSControlInteger(NVSDBName, NVSVarLEDTauNight, true, NVSStdLEDTauNight);
       // build float (devide integer by 1000) for LED program
       LEDTau = LEDTauThousand / 1000.0;

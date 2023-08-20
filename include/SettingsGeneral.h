@@ -15,7 +15,7 @@ const char* MQTTTopicStartTimeNight     = "StartTimeNight"; // 1:5..13:9 = 01:05
 const char* MQTTTopicTimePhase          = "TimePhase";      // 0: nighttime; 1: daytime
 const char* MQTTTopicLEDStatus          = "LEDStatus";      // 0: Lights ON; 1: Lights Off
 const char* MQTTTopicLEDBrightness      = "LEDBrightness";  // 0..100 = Lights off .. full intensity
-const char* MQTTTopicLEDQuickness       = "LEDQuickness";   // -100..0..100 = slow..linear..fast
+const char* MQTTTopicLEDAmplifier       = "LEDAmplifier";   // -100..0..100 = slow..linear..fast
 const char* MQTTTopicLEDTauThousand     = "LEDTauThousand"; // 5125..8200 = (faster increase) 41/8*1000..41/5*1000 (slower increase)
 const char* MQTTTopicLEDColorTop        = "LEDColorTop";    // [  5, 55,255]
 const char* MQTTTopicLEDColorBottom     = "LEDColorBottom"; // [  5, 55,255]
@@ -37,8 +37,8 @@ const char* NVSVarLEDStatusDay          = "Value05";
 const char* NVSVarLEDStatusNight        = "Value06";
 const char* NVSVarLEDBrightnessDay      = "Value07";
 const char* NVSVarLEDBrightnessNight    = "Value08";
-const char* NVSVarLEDQuicknessDay       = "Value09";
-const char* NVSVarLEDQuicknessNight     = "Value10";
+const char* NVSVarLEDAmplifierDay       = "Value09";
+const char* NVSVarLEDAmplifierNight     = "Value10";
 const char* NVSVarLEDTauDay             = "Value11";
 const char* NVSVarLEDTauNight           = "Value12";
 const char* NVSVarLEDColorTopDayR       = "Value13";
@@ -63,8 +63,8 @@ int NVSStdLEDStatusDay = 1;
 int NVSStdLEDStatusNight = 1;
 int NVSStdLEDBrightnessDay = 70;
 int NVSStdLEDBrightnessNight = 30;
-int NVSStdLEDQuicknessDay = 0;
-int NVSStdLEDQuicknessNight = 0;
+int NVSStdLEDAmplifierDay = 0;
+int NVSStdLEDAmplifierNight = 0;
 int NVSStdLEDTauDay = 5125;
 int NVSStdLEDTauNight = 5125;
 int NVSStdLEDColorTopDayR= 0;
@@ -97,7 +97,7 @@ const int LEDPin = 8;
 int LEDStatus;
 int LEDBrightness;
 int LEDBrightnessCorrection;
-int LEDQuickness;
+int LEDAmplifier;
 int LEDTauThousand;
 float LEDTau;
 int LEDColorTopR;
