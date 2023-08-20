@@ -12,10 +12,11 @@ const int MQTTPort = 1883;
 // MQTT - subscribed topics
 const char* MQTTTopicStartTimeDay       = "StartTimeDay";   // 1:5..13:9 = 01:05..13:09
 const char* MQTTTopicStartTimeNight     = "StartTimeNight"; // 1:5..13:9 = 01:05..13:09
-const char* MQTTTopicLEDStatus          = "LEDStatus";      // 0: Night; 1: Day
+const char* MQTTTopicTimePhase          = "TimePhase";      // 0: nighttime; 1: daytime
+const char* MQTTTopicLEDStatus          = "LEDStatus";      // 0: Lights ON; 1: Lights Off
 const char* MQTTTopicLEDBrightness      = "LEDBrightness";  // 0..100 = Lights off .. full intensity
 const char* MQTTTopicLEDQuickness       = "LEDQuickness";   // -100..0..100 = slow..linear..fast
-const char* MQTTTopicLEDTau             = "LEDTau";         // 5125..8200 = (faster increase) 41/8*1000..41/5*1000 (slower increase)
+const char* MQTTTopicLEDTauThousand     = "LEDTauThousand"; // 5125..8200 = (faster increase) 41/8*1000..41/5*1000 (slower increase)
 const char* MQTTTopicLEDColorTop        = "LEDColorTop";    // [  5, 55,255]
 const char* MQTTTopicLEDColorBottom     = "LEDColorBottom"; // [  5, 55,255]
 
@@ -64,8 +65,8 @@ int NVSStdLEDBrightnessDay = 70;
 int NVSStdLEDBrightnessNight = 30;
 int NVSStdLEDQuicknessDay = 0;
 int NVSStdLEDQuicknessNight = 0;
-float NVSStdLEDTauDay = 5.125;
-float NVSStdLEDTauNight = 5.125;
+int NVSStdLEDTauDay = 5125;
+int NVSStdLEDTauNight = 5125;
 int NVSStdLEDColorTopDayR= 0;
 int NVSStdLEDColorTopDayG = 193;
 int NVSStdLEDColorTopDayB = 255;
@@ -86,6 +87,7 @@ int StartTimeDayHours;
 int StartTimeDayMinutes;
 int StartTimeNightHours;
 int StartTimeNightMinutes;
+int TimePhase;
 bool OneTimeCodeExecutedDay = false;
 bool OneTimeCodeExecutedNight = false;
 
@@ -96,6 +98,7 @@ int LEDStatus;
 int LEDBrightness;
 int LEDBrightnessCorrection;
 int LEDQuickness;
+int LEDTauThousand;
 float LEDTau;
 int LEDColorTopR;
 int LEDColorTopG;

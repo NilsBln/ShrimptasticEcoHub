@@ -123,7 +123,7 @@ void MQTTStartConnection() {
       mqttClient.subscribe(MQTTTopicLEDStatus);
       mqttClient.subscribe(MQTTTopicLEDBrightness);
       mqttClient.subscribe(MQTTTopicLEDQuickness);
-      mqttClient.subscribe(MQTTTopicLEDTau);
+      mqttClient.subscribe(MQTTTopicLEDTauThousand);
       mqttClient.subscribe(MQTTTopicLEDColorTop);
       mqttClient.subscribe(MQTTTopicLEDColorBottom);
       mqttClient.setCallback(MQTTCallback);
@@ -282,25 +282,24 @@ void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
     Serial.println("-----");
   }
   // -------------------------------------------------------------------
-  // topic is 'LEDTau', day and night
+  // topic is 'LEDTauThousand', day and night
   // -------------------------------------------------------------------
-  else if (strcmp(TopicName, MQTTTopicLEDTau) == 0) {
-    LEDTau = 0.0;
-    int LEDTauTemp = 0;
+  else if (strcmp(TopicName, MQTTTopicLEDTauThousand) == 0) {
+    LEDTauThousand = 0;
     // read message and store value
     for (int i=0;i<MessageLength;i++) {
-      LEDTauTemp = LEDTauTemp * 10.0 + ((char)Message[i] -'0');
+      LEDTauThousand = LEDTauThousand * 10.0 + ((char)Message[i] -'0');
     }
-    // devide by 1000 to get correct float
-    LEDTau = LEDTauTemp / 1000.0;
+    // build float (devide integer by 1000) for LED program
+    LEDTau = LEDTauThousand / 1000.0;
     Serial.printf("MQTT / message received on topic '%s': %.3f\n", TopicName, LEDTau);
     Serial.println("");
     // store 'NewValue' in NVS database according to time phase
     if (isDayPhase) {
-      NVSControlFloat(NVSDBName, NVSVarLEDTauDay, true, NVSStdLEDTauDay, LEDTau);
+      NVSControlInteger(NVSDBName, NVSVarLEDTauDay, true, NVSStdLEDTauDay, LEDTauThousand);
     }
     else {
-      NVSControlFloat(NVSDBName, NVSVarLEDTauNight, true, NVSStdLEDTauNight, LEDTau);
+      NVSControlInteger(NVSDBName, NVSVarLEDTauNight, true, NVSStdLEDTauNight, LEDTauThousand);
     }
     Serial.println("-----");
   }
@@ -406,6 +405,11 @@ void MQTTSendSettings() {
   mqttClient.publish(MQTTTopicStartTimeNight, message.c_str());
   resetVariables();
 
+  // TimePhase
+  message = std::to_string(TimePhase);
+  mqttClient.publish(MQTTTopicTimePhase, message.c_str());
+  resetVariables();
+
   // LEDStatus
   message = std::to_string(LEDStatus);
   mqttClient.publish(MQTTTopicLEDStatus, message.c_str());
@@ -422,8 +426,8 @@ void MQTTSendSettings() {
   resetVariables();
 
   // LEDTau
-  message = std::to_string(static_cast<int>(LEDTau*1000));
-  mqttClient.publish(MQTTTopicLEDTau, message.c_str());
+  message = std::to_string(LEDTauThousand);
+  mqttClient.publish(MQTTTopicLEDTauThousand, message.c_str());
   resetVariables();
 
   // LEDColorTop
@@ -495,9 +499,11 @@ float NTPTimeDecimal() {
 
 // NTP - check day phase
 bool NTPCheckTimePhase() {
-    return ((NTPTimeDecimal() >= StartTimeDay && NTPTimeDecimal() < StartTimeNight) ||
-            (NTPTimeDecimal() >= StartTimeDay && StartTimeNight < StartTimeDay) ||
-            (NTPTimeDecimal() < StartTimeNight && StartTimeDay > StartTimeNight));
+  bool isDayPhase = ((NTPTimeDecimal() >= StartTimeDay && NTPTimeDecimal() < StartTimeNight) ||
+                    (NTPTimeDecimal() >= StartTimeDay && StartTimeNight < StartTimeDay) ||
+                    (NTPTimeDecimal() < StartTimeNight && StartTimeDay > StartTimeNight));
+  TimePhase = isDayPhase ? 1 : 0;
+  return isDayPhase;
 }
 
 // NVS - create, read and edit database variables, type integer
@@ -591,97 +597,6 @@ int NVSControlInteger(const char* DBName, const char* VariableName, bool Writing
   return ReturnValue;
 }
 
-// NVS - create, read and edit database variables, type float
-float NVSControlFloat(const char* DBName, const char* VariableName, bool WritingModeIsActive, float DefaultValue, float NewValue = 999999) {
-  float SavedValue = 999999;
-  float ReturnValue;
-  // query variable in read mode
-  // 'DBName' does not exist
-  if(!preferences.begin(DBName, true)) {
-    Serial.printf("NVS / database '%s' does not exist, therefore the output value: %.3f\n", DBName, SavedValue);
-    ReturnValue = SavedValue;
-  }
-  // 'DBName' does exist
-  else {
-    SavedValue = preferences.getFloat(VariableName, 999999);
-    // 'DBName' does exist + 'VariableName' does not exist
-    if (SavedValue == 999999) {
-      Serial.printf("NVS / variable '%s' does not exist, therefore the output value: %.3f\n", VariableName, SavedValue);
-      ReturnValue = SavedValue;
-    }
-    // 'DBName' does exist + 'VariableName' does exist
-    else {
-      Serial.printf("NVS / variable '%s' read with value: %.3f\n", VariableName, SavedValue);
-      ReturnValue = SavedValue;
-    }
-  }
-  // close storage
-  preferences.end();
-
-  // writing mode is active
-  if (WritingModeIsActive) {
-    // if 'DBName' does not exist, it will be automatically created now
-    preferences.begin(DBName, false);
-    // 'VariableName' does exist
-    if (SavedValue != 999999) {
-      // 'VariableName' does exist + 'NewValue' was passed
-      if (NewValue != 999999) {
-        // 'VariableName' does exist + 'NewValue' was passed + 'NewValue' != 'SavedValue'
-        if (SavedValue != NewValue) {
-          // update 'VariableName' with 'NewValue' in database
-          preferences.putFloat(VariableName, NewValue);
-          Serial.printf("NVS / variable '%s' overwritten, old value: ", VariableName);
-          Serial.print(SavedValue, 3);
-          Serial.print(", new value: ");
-          Serial.print(NewValue, 3);
-          Serial.println();
-          ReturnValue = NewValue;
-        }
-        // 'VariableName' does exist + 'NewValue' was passed + 'NewValue' = 'SavedValue'
-        else {
-          // no change of 'VariableName' in database
-          Serial.printf("NVS / variable '%s' without change of identical value: ", VariableName);
-          Serial.print(SavedValue, 3);
-          Serial.println();
-          ReturnValue = SavedValue;
-        }
-      }
-      // 'VariableName' does exist + 'NewValue' was not passed
-      else {
-        // no change of 'VariableName' in database
-        Serial.printf("NVS / variable '%s' without change of value: ", VariableName);
-        Serial.print(SavedValue, 3);
-        Serial.println();
-        ReturnValue = SavedValue;
-      }
-    }
-    // 'VariableName' does not exist
-    else {
-      // 'VariableName' does not exist + 'NewValue' was passed
-      if (NewValue != 999999) {
-        // store 'VariableName' with 'NewValue' in database
-        preferences.putFloat(VariableName, NewValue);
-        Serial.printf("NVS / variable '%s' created with new value: ", VariableName);
-        Serial.print(NewValue, 3);
-        Serial.println();
-        ReturnValue = NewValue;
-      }
-      // 'VariableName' does not exist + 'NewValue' was not passed
-      else {
-        // store 'VariableName' with 'DefaultValue' in database
-        preferences.putFloat(VariableName, DefaultValue);
-        Serial.printf("NVS / variable '%s' created with default value: ", VariableName);
-        Serial.print(DefaultValue, 3);
-        Serial.println();
-        ReturnValue = DefaultValue;
-      }
-    }
-    // close storage
-    preferences.end();
-  }
-  return ReturnValue;
-}
-
 // NVS - read stored values from NVS depending on daytime
 void NVSReadSettings(bool ReadTimeSettings, bool ReadTimePhaseSettings) {
   if (ReadTimeSettings) {
@@ -701,7 +616,9 @@ void NVSReadSettings(bool ReadTimeSettings, bool ReadTimePhaseSettings) {
       LEDStatus = NVSControlInteger(NVSDBName, NVSVarLEDStatusDay, true, NVSStdLEDStatusDay);
       LEDBrightness = NVSControlInteger(NVSDBName, NVSVarLEDBrightnessDay, true, NVSStdLEDBrightnessDay);
       LEDQuickness = NVSControlInteger(NVSDBName, NVSVarLEDQuicknessDay, true, NVSStdLEDQuicknessDay);
-      LEDTau = NVSControlFloat(NVSDBName, NVSVarLEDTauDay, true, NVSStdLEDTauDay);
+      LEDTauThousand = NVSControlInteger(NVSDBName, NVSVarLEDTauDay, true, NVSStdLEDTauDay);
+      // build float (devide integer by 1000) for LED program
+      LEDTau = LEDTauThousand / 1000.0;
       LEDColorTopR = NVSControlInteger(NVSDBName, NVSVarLEDColorTopDayR, true, NVSStdLEDColorTopDayR);
       LEDColorTopG = NVSControlInteger(NVSDBName, NVSVarLEDColorTopDayG, true, NVSStdLEDColorTopDayG);
       LEDColorTopB = NVSControlInteger(NVSDBName, NVSVarLEDColorTopDayB, true, NVSStdLEDColorTopDayB);
@@ -716,7 +633,9 @@ void NVSReadSettings(bool ReadTimeSettings, bool ReadTimePhaseSettings) {
       LEDStatus = NVSControlInteger(NVSDBName, NVSVarLEDStatusNight, true, NVSStdLEDStatusNight);
       LEDBrightness = NVSControlInteger(NVSDBName, NVSVarLEDBrightnessNight, true, NVSStdLEDBrightnessNight);
       LEDQuickness = NVSControlInteger(NVSDBName, NVSVarLEDQuicknessNight, true, NVSStdLEDQuicknessNight);
-      LEDTau = NVSControlFloat(NVSDBName, NVSVarLEDTauNight, true, NVSStdLEDTauNight);
+      LEDTauThousand = NVSControlInteger(NVSDBName, NVSVarLEDTauNight, true, NVSStdLEDTauNight);
+      // build float (devide integer by 1000) for LED program
+      LEDTau = LEDTauThousand / 1000.0;
       LEDColorTopR = NVSControlInteger(NVSDBName, NVSVarLEDColorTopNightR, true, NVSStdLEDColorTopNightR);
       LEDColorTopG = NVSControlInteger(NVSDBName, NVSVarLEDColorTopNightG, true, NVSStdLEDColorTopNightG);
       LEDColorTopB = NVSControlInteger(NVSDBName, NVSVarLEDColorTopNightB, true, NVSStdLEDColorTopNightB);
