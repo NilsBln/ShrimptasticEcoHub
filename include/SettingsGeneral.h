@@ -4,8 +4,6 @@
 
 // WiFi & MQTT - status
 bool isConnecting = false;
-bool isSending = false;
-int MQTTNumLoops;
 
 // MQTT - server settings
 const char* MQTTServer = "192.168.178.25";
