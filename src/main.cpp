@@ -126,6 +126,8 @@ void MQTTStartConnection() {
       mqttClient.subscribe(MQTTTopicLEDTauThousand);
       mqttClient.subscribe(MQTTTopicLEDColorTop);
       mqttClient.subscribe(MQTTTopicLEDColorBottom);
+      mqttClient.subscribe(MQTTTopicLEDColorWhite);
+      mqttClient.subscribe(MQTTTopicUpdate);
       mqttClient.setCallback(MQTTCallback);
     }
     else
@@ -145,10 +147,8 @@ void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
   // -------------------------------------------------------------------
   if (strcmp(TopicName, MQTTTopicStartTimeDay) == 0) {
     bool minutesStart = false;
-    const int StartTimeDayHoursOld = StartTimeDayHours;
-    const int StartTimeDayMinutesOld = StartTimeDayMinutes;
-    StartTimeDayHours = 0;
-    StartTimeDayMinutes = 0;
+    int StartTimeDayHoursNew = 0;
+    int StartTimeDayMinutesNew = 0;
     // read message and store values
     for (int i=0;i<MessageLength;i++) {
       if (Message[i] == ':') {
@@ -156,13 +156,15 @@ void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
         i++; // skip this character
       }
       if (!minutesStart) {
-        StartTimeDayHours = StartTimeDayHours * 10 + ((char)Message[i] -'0');
+        StartTimeDayHoursNew = StartTimeDayHoursNew * 10 + ((char)Message[i] -'0');
       }
       else {
-        StartTimeDayMinutes = StartTimeDayMinutes * 10 + ((char)Message[i] -'0');
+        StartTimeDayMinutesNew = StartTimeDayMinutesNew * 10 + ((char)Message[i] -'0');
       }
     }
-    if (StartTimeDayHours != StartTimeDayHoursOld || StartTimeDayMinutes != StartTimeDayMinutesOld) {
+    if (StartTimeDayHours != StartTimeDayHoursNew || StartTimeDayMinutes != StartTimeDayMinutesNew) {
+      StartTimeDayHours = StartTimeDayHoursNew;
+      StartTimeDayMinutes = StartTimeDayMinutesNew;
       // build float for easier comparison with actual time
       StartTimeDay = StartTimeDayHours + static_cast<float>(StartTimeDayMinutes) / 60.0;
       Serial.printf("MQTT / message received on topic '%s': %.3f\n", TopicName, StartTimeDay);
@@ -182,10 +184,8 @@ void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
   // -------------------------------------------------------------------
   else if (strcmp(TopicName, MQTTTopicStartTimeNight) == 0) {
     bool minutesStart = false;
-    const int StartTimeNightHoursOld = StartTimeNightHours;
-    const int StartTimeNightMinutesOld = StartTimeNightMinutes;
-    StartTimeNightHours = 0;
-    StartTimeNightMinutes = 0;
+    int StartTimeNightHoursNew = 0;
+    int StartTimeNightMinutesNew = 0;
     // read message and store values
     for (int i=0;i<MessageLength;i++) {
       if (Message[i] == ':') {
@@ -193,13 +193,15 @@ void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
         i++; // skip this character
       }
       if (!minutesStart) {
-        StartTimeNightHours = StartTimeNightHours * 10 + ((char)Message[i] -'0');
+        StartTimeNightHoursNew = StartTimeNightHoursNew * 10 + ((char)Message[i] -'0');
       }
       else {
-        StartTimeNightMinutes = StartTimeNightMinutes * 10 + ((char)Message[i] -'0');
+        StartTimeNightMinutesNew = StartTimeNightMinutesNew * 10 + ((char)Message[i] -'0');
       }
     }
-    if (StartTimeNightHours != StartTimeNightHoursOld || StartTimeNightMinutes != StartTimeNightMinutesOld) {
+    if (StartTimeNightHours != StartTimeNightHoursNew || StartTimeNightMinutes != StartTimeNightMinutesNew) {
+      StartTimeNightHours = StartTimeNightHoursNew;
+      StartTimeNightMinutes = StartTimeNightMinutesNew;
       // build float for easier comparison with actual time
       StartTimeNight = StartTimeNightHours + static_cast<float>(StartTimeNightMinutes) / 60.0;
       Serial.printf("MQTT / message received on topic '%s': %.3f\n", TopicName, StartTimeNight);
@@ -218,13 +220,13 @@ void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
   // topic is 'LEDStatus', day and night
   // -------------------------------------------------------------------
   else if (strcmp(TopicName, MQTTTopicLEDStatus) == 0) {
-    const int LEDStatusOld = LEDStatus;
-    LEDStatus = 0;
+    int LEDStatusNew = 0;
     // read message and store value
     for (int i=0;i<MessageLength;i++) {
-      LEDStatus = LEDStatus * 10 + ((char)Message[i] -'0');
+      LEDStatusNew = LEDStatusNew * 10 + ((char)Message[i] -'0');
     }
-    if (LEDStatus != LEDStatusOld) {
+    if (LEDStatus != LEDStatusNew) {
+      LEDStatus = LEDStatusNew;
       Serial.printf("MQTT / message received on topic '%s': %d\n", TopicName, LEDStatus);
       Serial.println("-----");
       // store 'NewValue' in NVS database according to time phase
@@ -246,13 +248,13 @@ void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
   // topic is 'LEDBrightness', day and night
   // -------------------------------------------------------------------
   else if (strcmp(TopicName, MQTTTopicLEDBrightness) == 0) {
-    const int LEDBrightnessOld = LEDBrightness;
-    LEDBrightness = 0;
+    int LEDBrightnessNew = 0;
     // read message and store value
     for (int i=0;i<MessageLength;i++) {
-      LEDBrightness = LEDBrightness * 10 + ((char)Message[i] -'0');
+      LEDBrightnessNew = LEDBrightnessNew * 10 + ((char)Message[i] -'0');
     }
-    if (LEDBrightness != LEDBrightnessOld) {
+    if (LEDBrightness != LEDBrightnessNew) {
+      LEDBrightness = LEDBrightnessNew;
       Serial.printf("MQTT / message received on topic '%s': %d\n", TopicName, LEDBrightness);
       Serial.println("-----");
       // store 'NewValue' in NVS database according to time phase
@@ -274,8 +276,7 @@ void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
   // topic is 'LEDAmplifier', day and night
   // -------------------------------------------------------------------
   else if (strcmp(TopicName, MQTTTopicLEDAmplifier) == 0) {
-    const int LEDAmplifierOld = LEDAmplifier;
-    LEDAmplifier = 0;
+    int LEDAmplifierNew = 0;
     bool isNegative = false;
     // check if first character is minus sign
     if (Message[0] == '-') {
@@ -285,12 +286,13 @@ void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
     int startIndex = isNegative ? 1 : 0;
     // read message and store value
     for (int i=startIndex;i<MessageLength;i++) {
-      LEDAmplifier = LEDAmplifier * 10 + ((char)Message[i] -'0');
+      LEDAmplifierNew = LEDAmplifierNew * 10 + ((char)Message[i] -'0');
     }
     if (isNegative) {
-      LEDAmplifier = LEDAmplifier * -1;
+      LEDAmplifierNew = LEDAmplifierNew * -1;
     }
-    if (LEDAmplifier != LEDAmplifierOld) {
+    if (LEDAmplifier != LEDAmplifierNew) {
+      LEDAmplifier = LEDAmplifierNew;
       Serial.printf("MQTT / message received on topic '%s': %d\n", TopicName, LEDAmplifier);
       Serial.println("-----");
       // store 'NewValue' in NVS database according to time phase
@@ -312,13 +314,13 @@ void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
   // topic is 'LEDTauThousand', day and night
   // -------------------------------------------------------------------
   else if (strcmp(TopicName, MQTTTopicLEDTauThousand) == 0) {
-    const int LEDTauThousandOld = LEDTauThousand;
-    LEDTauThousand = 0;
+    int LEDTauThousandNew = 0;
     // read message and store value
     for (int i=0;i<MessageLength;i++) {
-      LEDTauThousand = LEDTauThousand * 10.0 + ((char)Message[i] -'0');
+      LEDTauThousandNew = LEDTauThousandNew * 10.0 + ((char)Message[i] -'0');
     }
-    if(LEDTauThousand != LEDTauThousandOld){
+    if(LEDTauThousand != LEDTauThousandNew){
+      LEDTauThousand = LEDTauThousandNew;
       // build float (devide integer by 1000) for LED program
       LEDTau = LEDTauThousand / 1000.0;
       Serial.printf("MQTT / message received on topic '%s': %.3f\n", TopicName, LEDTau);
@@ -342,29 +344,29 @@ void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
   // topic is 'LEDColorTop', day and night
   // -------------------------------------------------------------------
   else if (strcmp(TopicName, MQTTTopicLEDColorTop) == 0) {
-    const int LEDColorTopROld = LEDColorTopR;
-    const int LEDColorTopGOld = LEDColorTopG;
-    const int LEDColorTopBOld = LEDColorTopB;
-    LEDColorTopR = 0;
-    LEDColorTopG = 0;
-    LEDColorTopB = 0;
+    int LEDColorTopRNew = 0;
+    int LEDColorTopGNew = 0;
+    int LEDColorTopBNew = 0;
     // read message and store values
     for (int i=1;i<=3;i++) {
       if ((char)Message[i] != ' ') {
-        LEDColorTopR = LEDColorTopR * 10 + ((char)Message[i] -'0');
+        LEDColorTopRNew = LEDColorTopRNew * 10 + ((char)Message[i] -'0');
       }
     }
     for (int i=5;i<=7;i++) {
       if ((char)Message[i] != ' ') {
-        LEDColorTopG = LEDColorTopG * 10 + ((char)Message[i] -'0');
+        LEDColorTopGNew = LEDColorTopGNew * 10 + ((char)Message[i] -'0');
       }
     }
     for (int i=9;i<=11;i++) {
       if ((char)Message[i] != ' ') {
-        LEDColorTopB = LEDColorTopB * 10 + ((char)Message[i] -'0');
+        LEDColorTopBNew = LEDColorTopBNew * 10 + ((char)Message[i] -'0');
       }
     }
-    if (LEDColorTopR != LEDColorTopROld || LEDColorTopG != LEDColorTopGOld || LEDColorTopB != LEDColorTopBOld) {
+    if (LEDColorTopR != LEDColorTopRNew || LEDColorTopG != LEDColorTopGNew || LEDColorTopB != LEDColorTopBNew) {
+      LEDColorTopR = LEDColorTopRNew;
+      LEDColorTopG = LEDColorTopGNew;
+      LEDColorTopB = LEDColorTopBNew;
       Serial.printf("MQTT / message received on topic '%s': %d, %d, %d\n", TopicName, LEDColorTopR, LEDColorTopG, LEDColorTopB);
       Serial.println("-----");
       // store 'NewValue' in NVS database according to time phase
@@ -390,29 +392,29 @@ void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
   // topic is 'LEDColorBottom', day and night
   // -------------------------------------------------------------------
   else if (strcmp(TopicName, MQTTTopicLEDColorBottom) == 0) {
-    const int LEDColorBottomROld = LEDColorBottomR;
-    const int LEDColorBottomGOld = LEDColorBottomG;
-    const int LEDColorBottomBOld = LEDColorBottomB;
-    LEDColorBottomR = 0;
-    LEDColorBottomG = 0;
-    LEDColorBottomB = 0;
+    int LEDColorBottomRNew = 0;
+    int LEDColorBottomGNew = 0;
+    int LEDColorBottomBNew = 0;
     // read message and store values
     for (int i=1;i<=3;i++) {
       if ((char)Message[i] != ' ') {
-      LEDColorBottomR = LEDColorBottomR * 10 + ((char)Message[i] -'0');
+      LEDColorBottomRNew = LEDColorBottomRNew * 10 + ((char)Message[i] -'0');
       }
     }
     for (int i=5;i<=7;i++) {
       if ((char)Message[i] != ' ') {
-      LEDColorBottomG = LEDColorBottomG * 10 + ((char)Message[i] -'0');
+      LEDColorBottomGNew = LEDColorBottomGNew * 10 + ((char)Message[i] -'0');
       }
     }
     for (int i=9;i<=11;i++) {
       if ((char)Message[i] != ' ') {
-      LEDColorBottomB = LEDColorBottomB * 10 + ((char)Message[i] -'0');
+      LEDColorBottomBNew = LEDColorBottomBNew * 10 + ((char)Message[i] -'0');
       }
     }
-    if (LEDColorBottomR != LEDColorBottomROld || LEDColorBottomG != LEDColorBottomGOld || LEDColorBottomB != LEDColorBottomBOld) {
+    if (LEDColorBottomR != LEDColorBottomRNew || LEDColorBottomG != LEDColorBottomGNew || LEDColorBottomB != LEDColorBottomBNew) {
+      LEDColorBottomR = LEDColorBottomRNew;
+      LEDColorBottomG = LEDColorBottomGNew;
+      LEDColorBottomB = LEDColorBottomBNew;
       Serial.printf("MQTT / message received on topic '%s': %d, %d, %d\n", TopicName, LEDColorBottomR, LEDColorBottomG, LEDColorBottomB);
       Serial.println("-----");
       // store 'NewValue' in NVS database according to time phase
@@ -433,6 +435,43 @@ void MQTTCallback(char* TopicName, byte* Message, unsigned int MessageLength) {
       Serial.printf("MQTT / identical incoming message for '%s' ignored!\n", TopicName);
       Serial.println("-----");
     }
+  }
+  // -------------------------------------------------------------------
+  // topic is 'LEDColorWhite', day and night
+  // -------------------------------------------------------------------
+  else if (strcmp(TopicName, MQTTTopicLEDColorWhite) == 0) {
+    int LEDColorWhiteNew = 0;
+    // read message and store value
+    for (int i=0;i<MessageLength;i++) {
+      LEDColorWhiteNew = LEDColorWhiteNew * 10 + ((char)Message[i] -'0');
+    }
+    if (LEDColorWhite != LEDColorWhiteNew) {
+      LEDColorWhite = LEDColorWhiteNew;
+      Serial.printf("MQTT / message received on topic '%s': %d\n", TopicName, LEDColorWhite);
+      Serial.println("-----");
+      // store 'NewValue' in NVS database according to time phase
+      if (isDayPhase) {
+        NVSControlInteger(NVSDBName, NVSVarLEDColorWhiteDay, true, NVSStdLEDColorWhiteDay, LEDColorWhite);
+      }
+      else {
+        NVSControlInteger(NVSDBName, NVSVarLEDColorWhiteNight, true, NVSStdLEDColorWhiteNight, LEDColorWhite);
+      }
+      Serial.println("-----");
+      LEDColorControl();
+    }
+    else {
+      Serial.printf("MQTT / identical incoming message for '%s' ignored!\n", TopicName);
+      Serial.println("-----");
+    }
+  }
+  // -------------------------------------------------------------------
+  // topic is 'Update'
+  // -------------------------------------------------------------------
+  else if (strcmp(TopicName, MQTTTopicUpdate) == 0) {
+    Serial.printf("MQTT / message received on topic '%s'\n", TopicName);
+    Serial.println("MQTT / start sending settings...");
+    Serial.println("-----");
+    MQTTSendSettings();
   }
 }
 
@@ -505,6 +544,11 @@ void MQTTSendSettings() {
             PaddingG + std::to_string(LEDColorBottomG) + "," +
             PaddingB + std::to_string(LEDColorBottomB) + "]";
   mqttClient.publish(MQTTTopicLEDColorBottom, message.c_str());
+  resetVariables();
+
+  // LEDColorWhite
+  message = std::to_string(LEDColorWhite);
+  mqttClient.publish(MQTTTopicLEDColorWhite, message.c_str());
   resetVariables();
 }
 
@@ -682,6 +726,7 @@ void NVSReadSettings(bool ReadTimeSettings, bool ReadTimePhaseSettings) {
       LEDColorBottomR = NVSControlInteger(NVSDBName, NVSVarLEDColorBottomDayR, true, NVSStdLEDColorBottomDayR);
       LEDColorBottomG = NVSControlInteger(NVSDBName, NVSVarLEDColorBottomDayG, true, NVSStdLEDColorBottomDayG);
       LEDColorBottomB = NVSControlInteger(NVSDBName, NVSVarLEDColorBottomDayB, true, NVSStdLEDColorBottomDayB);
+      LEDColorWhite = NVSControlInteger(NVSDBName, NVSVarLEDColorWhiteDay, true, NVSStdLEDColorWhiteDay);
       MQTTSendSettings();
       Serial.println("-----");
       Serial.println("Configuration / daytime LED settings loaded!");
@@ -700,6 +745,7 @@ void NVSReadSettings(bool ReadTimeSettings, bool ReadTimePhaseSettings) {
       LEDColorBottomR = NVSControlInteger(NVSDBName, NVSVarLEDColorBottomNightR, true, NVSStdLEDColorBottomNightR);
       LEDColorBottomG = NVSControlInteger(NVSDBName, NVSVarLEDColorBottomNightG, true, NVSStdLEDColorBottomNightG);
       LEDColorBottomB = NVSControlInteger(NVSDBName, NVSVarLEDColorBottomNightB, true, NVSStdLEDColorBottomNightB);
+      LEDColorWhite = NVSControlInteger(NVSDBName, NVSVarLEDColorWhiteNight, true, NVSStdLEDColorWhiteNight);
       MQTTSendSettings();
       Serial.println("-----");
       Serial.println("Configuration / nighttime LED settings loaded!");
@@ -727,12 +773,15 @@ void EmptySerialBuffer() {
 // a function to create mesmerizing LED brilliance and vibrant color shifts,
 // setting the perfect mood for contented shrimps to thrive
 void LEDColorControl() {
-  int LEDColorBottomNewR;
-  int LEDColorBottomNewG;
-  int LEDColorBottomNewB;
   int LEDColorTopNewR;
   int LEDColorTopNewG;
   int LEDColorTopNewB;
+  int LEDColorBottomNewR;
+  int LEDColorBottomNewG;
+  int LEDColorBottomNewB;
+  int LEDColorWLimit;
+  int LEDColorWMax = 0;
+  double LEDColorWBalanceFactor;
   int LEDColorDeltaR;
   int LEDColorDeltaG;
   int LEDColorDeltaB;
@@ -744,6 +793,7 @@ void LEDColorControl() {
   int LEDColorTempR;
   int LEDColorTempG;
   int LEDColorTempB;
+  int LEDColorTempW;
 
   // internal lambda function for limiting led color values to 255
   auto LimitTo255 = [](double Value) -> int {
@@ -776,50 +826,94 @@ void LEDColorControl() {
     return reduceFactor;
   };
 
-  LEDBrightnessReduceFactor = CalculateBrigthnessReduceFactor(LEDColorBottomR, LEDColorBottomG, LEDColorBottomB);
-  LEDColorBottomNewR = static_cast<int>(LEDBrightnessReduceFactor * static_cast<double>(LEDColorBottomR));
-  LEDColorBottomNewG = static_cast<int>(LEDBrightnessReduceFactor * static_cast<double>(LEDColorBottomG));
-  LEDColorBottomNewB = static_cast<int>(LEDBrightnessReduceFactor * static_cast<double>(LEDColorBottomB));
-  
-  LEDBrightnessReduceFactor = CalculateBrigthnessReduceFactor(LEDColorTopR, LEDColorTopG, LEDColorTopB);
-  LEDColorTopNewR = static_cast<int>(LEDBrightnessReduceFactor * static_cast<double>(LEDColorTopR));
-  LEDColorTopNewG = static_cast<int>(LEDBrightnessReduceFactor * static_cast<double>(LEDColorTopG));
-  LEDColorTopNewB = static_cast<int>(LEDBrightnessReduceFactor * static_cast<double>(LEDColorTopB));
-  
-  LEDColorDeltaR = LEDColorBottomNewR - LEDColorTopNewR;
-  LEDColorDeltaG = LEDColorBottomNewG - LEDColorTopNewG;
-  LEDColorDeltaB = LEDColorBottomNewB - LEDColorTopNewB;
+  if (LEDStatus != 0) {
+    LEDBrightnessReduceFactor = CalculateBrigthnessReduceFactor(LEDColorBottomR, LEDColorBottomG, LEDColorBottomB);
+    LEDColorBottomNewR = static_cast<int>(LEDBrightnessReduceFactor * static_cast<double>(LEDColorBottomR));
+    LEDColorBottomNewG = static_cast<int>(LEDBrightnessReduceFactor * static_cast<double>(LEDColorBottomG));
+    LEDColorBottomNewB = static_cast<int>(LEDBrightnessReduceFactor * static_cast<double>(LEDColorBottomB));
+    
+    LEDBrightnessReduceFactor = CalculateBrigthnessReduceFactor(LEDColorTopR, LEDColorTopG, LEDColorTopB);
+    LEDColorTopNewR = static_cast<int>(LEDBrightnessReduceFactor * static_cast<double>(LEDColorTopR));
+    LEDColorTopNewG = static_cast<int>(LEDBrightnessReduceFactor * static_cast<double>(LEDColorTopG));
+    LEDColorTopNewB = static_cast<int>(LEDBrightnessReduceFactor * static_cast<double>(LEDColorTopB));
+    
+    LEDColorDeltaR = LEDColorBottomNewR - LEDColorTopNewR;
+    LEDColorDeltaG = LEDColorBottomNewG - LEDColorTopNewG;
+    LEDColorDeltaB = LEDColorBottomNewB - LEDColorTopNewB;
 
-  Serial.println("LED / starting the LED strip configuration...");
-  Serial.println("-----");
-  // calculate the color of each led
-  for (int i = 1; i <= LEDPixelCount; ++i) {
-    if (i == 1) {
-      LEDColorTempR = LEDColorBottomNewR;
-      LEDColorTempG = LEDColorBottomNewG;
-      LEDColorTempB = LEDColorBottomNewB;
-    }
-    else if (i > 1 && i != LEDPixelCount) {
-      LEDAmplifierYFast = 1 - exp((-i + 1) / LEDTau);
-      LEDAmplifierYSlow = (1.0 / exp(1.0 / LEDTau * LEDPixelCount)) * exp(1.0 / LEDTau * i);
-      LEDAmplifierYLinear = (1.0 / (LEDPixelCount - 1)) * i - (1.0 / (LEDPixelCount - 1));
-      if (LEDAmplifier >= 0) {
-        LEDAmplifierY = LEDAmplifierYFast * LEDAmplifier / 100 + LEDAmplifierYLinear * (100 - LEDAmplifier) / 100;
-      } else {
-        LEDAmplifierY = LEDAmplifierYSlow * abs(LEDAmplifier) / 100 + LEDAmplifierYLinear * (100 - abs(LEDAmplifier)) / 100;
+    LEDColorWLimit = 255 * LEDColorWhite / 100.0;
+    
+    Serial.println("LED / starting the LED strip configuration...");
+    Serial.println("-----");
+    // the first 'for' loop only calculates the maximum average 'LEDColorWMax'
+    for (int i = 1; i <= LEDPixelCount; ++i) {
+      if (i == 1) {
+        LEDColorTempR = LEDColorBottomNewR;
+        LEDColorTempG = LEDColorBottomNewG;
+        LEDColorTempB = LEDColorBottomNewB;
       }
-      LEDColorTempR = LimitTo255(LEDColorBottomNewR - LEDColorDeltaR * LEDAmplifierY);
-      LEDColorTempG = LimitTo255(LEDColorBottomNewG - LEDColorDeltaG * LEDAmplifierY);
-      LEDColorTempB = LimitTo255(LEDColorBottomNewB - LEDColorDeltaB * LEDAmplifierY);
+      else if (i > 1 && i != LEDPixelCount) {
+        LEDAmplifierYFast = 1 - exp((-i + 1) / LEDTau);
+        LEDAmplifierYSlow = (1.0 / exp(1.0 / LEDTau * LEDPixelCount)) * exp(1.0 / LEDTau * i);
+        LEDAmplifierYLinear = (1.0 / (LEDPixelCount - 1)) * i - (1.0 / (LEDPixelCount - 1));
+        if (LEDAmplifier >= 0) {
+          LEDAmplifierY = LEDAmplifierYFast * LEDAmplifier / 100 + LEDAmplifierYLinear * (100 - LEDAmplifier) / 100;
+        } else {
+          LEDAmplifierY = LEDAmplifierYSlow * abs(LEDAmplifier) / 100 + LEDAmplifierYLinear * (100 - abs(LEDAmplifier)) / 100;
+        }
+        LEDColorTempR = LimitTo255(LEDColorBottomNewR - LEDColorDeltaR * LEDAmplifierY);
+        LEDColorTempG = LimitTo255(LEDColorBottomNewG - LEDColorDeltaG * LEDAmplifierY);
+        LEDColorTempB = LimitTo255(LEDColorBottomNewB - LEDColorDeltaB * LEDAmplifierY);
+      }
+      else {
+        LEDColorTempR = LEDColorTopNewR;
+        LEDColorTempG = LEDColorTopNewG;
+        LEDColorTempB = LEDColorTopNewB;
+      }
+      LEDColorTempW = (LEDColorTempR + LEDColorTempG + LEDColorTempB) / 3;
+      if (LEDColorTempW > LEDColorWMax) {
+        LEDColorWMax = LEDColorTempW;
+      }
     }
-    else {
-      LEDColorTempR = LEDColorTopNewR;
-      LEDColorTempG = LEDColorTopNewG;
-      LEDColorTempB = LEDColorTopNewB;
+    LEDColorWBalanceFactor = static_cast<double>(LEDColorWLimit) / static_cast<double>(LEDColorWMax);
+    // the second 'for' loop calculates all colors as before, but also the balanced white
+    for (int i = 1; i <= LEDPixelCount; ++i) {
+      if (i == 1) {
+        LEDColorTempR = LEDColorBottomNewR;
+        LEDColorTempG = LEDColorBottomNewG;
+        LEDColorTempB = LEDColorBottomNewB;
+      }
+      else if (i > 1 && i != LEDPixelCount) {
+        LEDAmplifierYFast = 1 - exp((-i + 1) / LEDTau);
+        LEDAmplifierYSlow = (1.0 / exp(1.0 / LEDTau * LEDPixelCount)) * exp(1.0 / LEDTau * i);
+        LEDAmplifierYLinear = (1.0 / (LEDPixelCount - 1)) * i - (1.0 / (LEDPixelCount - 1));
+        if (LEDAmplifier >= 0) {
+          LEDAmplifierY = LEDAmplifierYFast * LEDAmplifier / 100 + LEDAmplifierYLinear * (100 - LEDAmplifier) / 100;
+        } else {
+          LEDAmplifierY = LEDAmplifierYSlow * abs(LEDAmplifier) / 100 + LEDAmplifierYLinear * (100 - abs(LEDAmplifier)) / 100;
+        }
+        LEDColorTempR = LimitTo255(LEDColorBottomNewR - LEDColorDeltaR * LEDAmplifierY);
+        LEDColorTempG = LimitTo255(LEDColorBottomNewG - LEDColorDeltaG * LEDAmplifierY);
+        LEDColorTempB = LimitTo255(LEDColorBottomNewB - LEDColorDeltaB * LEDAmplifierY);
+      }
+      else {
+        LEDColorTempR = LEDColorTopNewR;
+        LEDColorTempG = LEDColorTopNewG;
+        LEDColorTempB = LEDColorTopNewB;
+      }
+      LEDColorTempW = LimitTo255(((LEDColorTempR + LEDColorTempG + LEDColorTempB) / 3) * LEDColorWBalanceFactor);
+      // configure the 'LEDStrip'
+      //LEDStrip.SetPixelColor(i, RgbwColor(LEDColorTempR, LEDColorTempG, LEDColorTempB, LEDColorTempW));
+      Serial.printf("LED / %2d: [%3d,%3d,%3d,%3d]\n", i, LEDColorTempR, LEDColorTempG, LEDColorTempB, LEDColorTempW);
     }
-    // configure the 'LEDStrip', without white led
-    //LEDStrip.SetPixelColor(i, RgbwColor(LEDColorTempR, LEDColorTempG, LEDColorTempB, 0));
-    Serial.printf("LED / %2d: [%3d,%3d,%3d]\n", i, LEDColorTempR, LEDColorTempG, LEDColorTempB);
+  }
+  else {
+    // set the color of each led to '0'
+    for (int i = 1; i <= LEDPixelCount; ++i) {
+      // configure the 'LEDStrip'
+      //LEDStrip.SetPixelColor(i, RgbwColor(0, 0, 0, 0));
+      Serial.printf("LED / %2d: [  0,  0,  0,  0]\n", i);
+    }
   }
   // activate the 'LEDStrip'
   //LEDStrip.Show();
