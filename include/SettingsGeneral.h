@@ -2,7 +2,7 @@
 // General Settings
 // -------------------------------------------------------------------
 
-// WiFi & MQTT - status
+// WiFi status
 bool isConnecting = false;
 
 // MQTT - server settings
@@ -101,7 +101,7 @@ bool OneTimeCodeExecutedNight = false;
 
 // LED strip calculation program
 const int LEDPixelCount = 41;
-const int LEDPin = 8;
+const int LEDPin = 27;
 int LEDStatus;
 int LEDBrightness;
 int LEDAmplifier;

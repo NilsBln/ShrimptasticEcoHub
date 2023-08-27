@@ -903,20 +903,20 @@ void LEDColorControl() {
       }
       LEDColorTempW = LimitTo255(((LEDColorTempR + LEDColorTempG + LEDColorTempB) / 3) * LEDColorWBalanceFactor);
       // configure the 'LEDStrip'
-      //LEDStrip.SetPixelColor(i, RgbwColor(LEDColorTempR, LEDColorTempG, LEDColorTempB, LEDColorTempW));
-      Serial.printf("LED / %2d: [%3d,%3d,%3d,%3d]\n", i, LEDColorTempR, LEDColorTempG, LEDColorTempB, LEDColorTempW);
+      LEDStrip.SetPixelColor(i-1, RgbwColor(LEDColorTempR, LEDColorTempG, LEDColorTempB, LEDColorTempW));
+      Serial.printf("LED / %2d: [%3d,%3d,%3d,%3d]\n", i-1, LEDColorTempR, LEDColorTempG, LEDColorTempB, LEDColorTempW);
     }
   }
   else {
     // set the color of each led to '0'
     for (int i = 1; i <= LEDPixelCount; ++i) {
       // configure the 'LEDStrip'
-      //LEDStrip.SetPixelColor(i, RgbwColor(0, 0, 0, 0));
-      Serial.printf("LED / %2d: [  0,  0,  0,  0]\n", i);
+      LEDStrip.SetPixelColor(i-1, RgbwColor(0, 0, 0, 0));
+      Serial.printf("LED / %2d: [  0,  0,  0,  0]\n", i-1);
     }
   }
   // activate the 'LEDStrip'
-  //LEDStrip.Show();
+  LEDStrip.Show();
   Serial.println("-----");
   Serial.println("LED / the LED strip configuration is activated!");
   Serial.println("-----");
@@ -948,8 +948,10 @@ void setup() {
   NVSReadSettings(true, false);
 
   // initialize 'LEDStrip'
-  //LEDStrip.Begin();
-  //LEDStrip.Show();
+  LEDStrip.Begin();
+  LEDStrip.Show();
+
+  delay(2000);
 
 }
 
